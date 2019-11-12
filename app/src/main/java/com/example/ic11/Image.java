@@ -2,5 +2,5 @@ package com.example.ic11;
 
 public class Image {
 
-    public String url; 
+    public String url, storagePath;
 }
