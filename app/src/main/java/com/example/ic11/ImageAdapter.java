@@ -34,22 +34,12 @@ public class ImageAdapter extends ArrayAdapter<Image> {
         }
 
         ImageView iv_picture = convertView.findViewById(R.id.iv_picture);
+        Log.d("demo", "image url : " + image.url);
 
         if(image.url != null && !image.url.equals("null")){
-            Log.d("demo", "image url : " + image.url);
+
             Picasso.get().load(image.url).into(iv_picture);
         }
-//
-//        try{
-//            ImageView iv_urlToImage = convertView.findViewById(R.id.iv_urlToImage);
-//            if(news.urlToImage != null || !news.urlToImage.equals("")){
-//                Picasso.with(convertView.getContext()).load(news.urlToImage).into(iv_urlToImage);
-//            }else{
-//                Toast.makeText(convertView.getContext(), "No image to load!", Toast.LENGTH_SHORT).show();
-//            }
-//        }catch(Exception e){
-//            Toast.makeText(convertView.getContext(), "No image to load!", Toast.LENGTH_SHORT).show();
-//        }
 
 
         return convertView;

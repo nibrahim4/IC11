@@ -3,7 +3,9 @@ package com.example.ic11;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
+import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.Bundle;
@@ -24,6 +26,7 @@ import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.gms.tasks.Task;
 import com.google.firebase.storage.FirebaseStorage;
+import com.google.firebase.storage.ListResult;
 import com.google.firebase.storage.OnProgressListener;
 import com.google.firebase.storage.StorageReference;
 import com.google.firebase.storage.UploadTask;
@@ -31,7 +34,16 @@ import com.squareup.picasso.Picasso;
 
 import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+
+/***
+ * Group 20
+ * Nia Ibrahim
+ * Nadia Dorado
+ */
 
 public class MainActivity extends AppCompatActivity {
 
@@ -42,7 +54,11 @@ public class MainActivity extends AppCompatActivity {
     public ImageView iv_picture;
     public ProgressBar progressBar;
     public ArrayList<Image> images = new ArrayList<Image>();
-
+    public String uuid;
+    public ImageAdapter ad  = null;
+    public ListView lv_sources;
+    public FirebaseStorage firebaseStorage = FirebaseStorage.getInstance();
+    public StorageReference storageReference = firebaseStorage.getReference();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -60,16 +76,78 @@ public class MainActivity extends AppCompatActivity {
 
         iv_picture = findViewById(R.id.iv_picture);
         progressBar = findViewById(R.id.progressBar);
+        lv_sources = findViewById(R.id.lv_images);
 
+        Task<ListResult> results = storageReference.child("images").listAll();
+
+        results.addOnSuccessListener(new OnSuccessListener<ListResult>() {
+            @Override
+            public void onSuccess(ListResult listResult) {
+
+                final ArrayList<Image> localImages = new ArrayList<Image>();
+               for(int i=0; i<listResult.getItems().size(); i++){
+                   final Image image = new Image();
+
+                   image.storagePath = listResult.getItems().get(i).getPath();
+
+                  listResult.getItems().get(i).getDownloadUrl()
+                          .addOnCompleteListener(new OnCompleteListener<Uri>() {
+                      @Override
+                      public void onComplete(@NonNull Task<Uri> task) {
+
+
+                          image.url = task.getResult().toString();
+                          images.add(image);
+
+                          Log.d(TAG, "image size: " + images.size());
+                          ad = new ImageAdapter(MainActivity.this,
+                                  android.R.layout.simple_list_item_1, images);
+
+                          // give adapter to ListView UI element to render
+                          lv_sources.setAdapter(ad);
+
+                          lv_sources.setOnItemClickListener(new android.widget.AdapterView.OnItemClickListener() {
+                              @Override
+                              public void onItemClick(final AdapterView<?> parent, final View view, final int position, long id) {
+                                  Image img = (Image) parent.getItemAtPosition(position);
+                                  Log.d(TAG, "Storage Path: " + img.storagePath);
+                                  StorageReference deleteRef = storageReference.child(img.storagePath);
+
+                                  deleteRef.delete().addOnSuccessListener(new OnSuccessListener<Void>() {
+                                      @Override
+                                      public void onSuccess(Void aVoid) {
+
+                                          ad.remove((Image) parent.getItemAtPosition(position));
+                                          Toast.makeText(MainActivity.this, "Deleted Successfully", Toast.LENGTH_SHORT).show();
+                                      }
+                                  }).addOnFailureListener(new OnFailureListener() {
+                                      @Override
+                                      public void onFailure(@NonNull Exception e) {
+                                          Log.d(TAG, "Exception: " + e.getMessage());
+                                          Toast.makeText(MainActivity.this, "Error deleting image!", Toast.LENGTH_SHORT).show();
+                                      }
+                                  });
+                              }
+                          });
+                      }
+                  });
+
+              }
+
+
+
+            }
+        });
 
     }
 //UPLOAD IMAGE TO CLOUD
     private void uploadImage(Bitmap photoBitmap) {
-        FirebaseStorage firebaseStorage = FirebaseStorage.getInstance();
-        final StorageReference storageReference = firebaseStorage.getReference();
+
         final Image image = new Image();
 
-        final StorageReference imageRepo = storageReference.child("images/" + UUID.randomUUID().toString() + ".png");
+         uuid = UUID.randomUUID().toString();
+
+        final StorageReference imageRepo = storageReference.child("images/" + uuid + ".png");
 
         image.storagePath = imageRepo.getPath();
 
@@ -109,13 +187,18 @@ public class MainActivity extends AppCompatActivity {
                     Log.d(TAG, "Image Download URL" + task.getResult());
                     String imageURL = task.getResult().toString();
 
+                    SharedPreferences sharedPref = getPreferences(Context.MODE_PRIVATE);
+                    SharedPreferences.Editor editor = sharedPref.edit();
+                    editor.putString(uuid, imageURL);
+                    editor.apply();
+
                     image.url = imageURL;
                     images.add(image);
 
-                    ListView lv_sources = findViewById(R.id.lv_images);
+//                    ListView lv_sources = findViewById(R.id.lv_images);
 
                     Log.d(TAG, "image size: " + images.size());
-                    ImageAdapter ad = new ImageAdapter(MainActivity.this,
+                    ad = new ImageAdapter(MainActivity.this,
                             android.R.layout.simple_list_item_1, images);
 
                     // give adapter to ListView UI element to render
@@ -124,12 +207,17 @@ public class MainActivity extends AppCompatActivity {
 
                     lv_sources.setOnItemClickListener(new android.widget.AdapterView.OnItemClickListener() {
                         @Override
-                        public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-                            StorageReference deleteRef = storageReference.child(image.storagePath);
+                        public void onItemClick(final AdapterView<?> parent, final View view, final int position, long id) {
+
+                            Image img = (Image) parent.getItemAtPosition(position);
+                            Log.d(TAG, "Storage Path: " + img.storagePath);
+
+                            StorageReference deleteRef = storageReference.child(img.storagePath);
 
                             deleteRef.delete().addOnSuccessListener(new OnSuccessListener<Void>() {
                                 @Override
                                 public void onSuccess(Void aVoid) {
+                                    ad.remove((Image) parent.getItemAtPosition(position));
                                     Toast.makeText(MainActivity.this, "Deleted Successfully", Toast.LENGTH_SHORT).show();
                                 }
                             }).addOnFailureListener(new OnFailureListener() {
@@ -152,9 +240,12 @@ public class MainActivity extends AppCompatActivity {
             public void onProgress(@NonNull UploadTask.TaskSnapshot taskSnapshot) {
                 double progress = (100.0 * taskSnapshot.getBytesTransferred()) / taskSnapshot.getTotalByteCount();
                 progressBar.setProgress((int) progress);
-                System.out.println("Upload is " + progress + "% done");
+                Toast.makeText(MainActivity.this, "Upload is " + progress + "% done", Toast.LENGTH_SHORT).show();;
             }
+
+
         });
+
     }
 
     //    TAKE PHOTO USING CAMERA...
@@ -176,8 +267,8 @@ public class MainActivity extends AppCompatActivity {
 
             bitmapUpload = imageBitmap;
             uploadImage(bitmapUpload);
-
-
         }
+
+        progressBar.setProgress(0);
     }
 }
